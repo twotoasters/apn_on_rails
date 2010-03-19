@@ -84,6 +84,19 @@ class APN::Notification < APN::Base
     message
   end
   
+  def send_using_shared_connection
+    begin
+      conn = APN::Connection.connection
+      res = conn.write(self.message_for_sending)
+    rescue Exception => e
+      APN::Connection.connection = nil;
+      retry
+    end
+    puts res
+    self.sent_at = Time.now
+    self.save
+  end
+  
   class << self
     
     # Opens a connection to the Apple APN server and attempts to batch deliver

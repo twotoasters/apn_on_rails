@@ -3,6 +3,21 @@ module APN
     
     class << self
       
+      attr_accessor :connection
+      
+      def connection
+        @connection ||= open_for_delivery_and_dont_close
+        @connection[0] #=> [ssl, sock]
+      end
+      
+      def close_connection
+        if connection
+          connection[0].close #ssl
+          connection[1].close #sock
+        end
+        @connection = nil;
+      end
+      
       # Yields up an SSL socket to write notifications to.
       # The connections are close automatically.
       # 
@@ -21,6 +36,10 @@ module APN
       #   configatron.apn.cert = File.join(rails_root, 'config', 'apple_push_notification_production.pem')) # Production
       def open_for_delivery(options = {}, &block)
         open(options, &block)
+      end
+      
+      def open_for_delivery_and_dont_close(options = {})
+        open_and_dont_close(options)
       end
       
       # Yields up an SSL socket to receive feedback from.
@@ -61,6 +80,23 @@ module APN
   
         ssl.close
         sock.close
+      end
+      
+      def open_and_dont_close(options = {})
+        options = {:cert => configatron.apn.cert,
+                   :passphrase => configatron.apn.passphrase,
+                   :host => configatron.apn.host,
+                   :port => configatron.apn.port}.merge(options)
+        cert = File.read(options[:cert])
+        ctx = OpenSSL::SSL::SSLContext.new
+        ctx.key = OpenSSL::PKey::RSA.new(cert, options[:passphrase])
+        ctx.cert = OpenSSL::X509::Certificate.new(cert)
+  
+        sock = TCPSocket.new(options[:host], options[:port])
+        ssl = OpenSSL::SSL::SSLSocket.new(sock, ctx)
+        ssl.sync = true
+        ssl.connect
+        [ssl, sock]
       end
       
     end
